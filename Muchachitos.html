@@ -5,10 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Muchachitos</title>
 
+  <!-- Librerías para generar el archivo PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
   <!-- Módulos de Firebase importados desde CDN -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, onValue, update, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDzCN7HFTHn7_LJjeEo1zMNel4mUPYeJHU",
@@ -24,10 +28,24 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const ninosRef = ref(db, 'ninos');
+    const historialRef = ref(db, 'historial_muchachitos');
 
-    // Rango de edad para Muchachitos (10 a 18 por si hay mayores)
+    // Rango de edad para Muchachitos
     const EDAD_MIN = 10;
     const EDAD_MAX = 18;
+
+    let historialMovimientos = [];
+
+    // Escuchar historial en tiempo real
+    onValue(historialRef, (snapshot) => {
+      const data = snapshot.val();
+      historialMovimientos = [];
+      if (data) {
+        for (let id in data) {
+          historialMovimientos.push(data[id]);
+        }
+      }
+    });
 
     // Escuchar modificaciones en tiempo real
     onValue(ninosRef, (snapshot) => {
@@ -62,12 +80,12 @@
               <div class="acciones">
                 <div class="action-group">
                   <input type="number" id="add-${id}" placeholder="Ganó" min="0" step="0.5">
-                  <button class="btn-add" onclick="window.modificarSaldo('${id}', ${saldoNum}, 'add-${id}', true)">+ Sumar</button>
+                  <button class="btn-add" onclick="window.modificarSaldo('${id}', '${n.nombre}', ${saldoNum}, 'add-${id}', true)">+ Sumar</button>
                 </div>
 
                 <div class="action-group">
                   <input type="number" id="sub-${id}" placeholder="Multa" min="0" step="0.5">
-                  <button class="btn-sub" onclick="window.modificarSaldo('${id}', ${saldoNum}, 'sub-${id}', false)">- Restar</button>
+                  <button class="btn-sub" onclick="window.modificarSaldo('${id}', '${n.nombre}', ${saldoNum}, 'sub-${id}', false)">- Restar</button>
                 </div>
               </div>
             </div>
@@ -78,7 +96,8 @@
       contenedor.innerHTML = hayMuchachitos ? html : '<p style="background:white; padding:15px; border-radius:8px;">No hay niños de 10 a 12 años.</p>';
     });
 
-    window.modificarSaldo = function(id, saldoActual, inputId, esSuma) {
+    // Modificar saldo y registrar movimiento en Firebase
+    window.modificarSaldo = function(id, nombreNino, saldoActual, inputId, esSuma) {
       const input = document.getElementById(inputId);
       const valor = parseFloat(input.value);
 
@@ -86,15 +105,111 @@
         let nuevoSaldo = parseFloat(saldoActual) + (esSuma ? valor : -valor);
         if (nuevoSaldo < 0) nuevoSaldo = 0;
 
-        // Actualizar directamente en Firebase
+        // 1. Actualizar saldo en Firebase
         update(ref(db, `ninos/${id}`), { saldo: nuevoSaldo });
+
+        // 2. Registrar fecha y hora del movimiento
+        const ahora = new Date();
+        const horaFormateada = ahora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const fechaFormateada = ahora.toLocaleDateString();
+
+        const movimiento = {
+          nombre: nombreNino,
+          tipo: esSuma ? 'Ganó' : 'Descontó',
+          monto: `${esSuma ? '+' : '-'}$${valor.toFixed(2)}`,
+          hora: `${fechaFormateada} ${horaFormateada}`
+        };
+
+        // Guardar movimiento en el historial
+        push(historialRef, movimiento);
+
+        input.value = '';
       }
+    };
+
+    // Función para descargar el PDF
+    window.descargarPDF = function() {
+      if (historialMovimientos.length === 0) {
+        alert("Aún no se ha realizado ningún movimiento.");
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Título principal
+      doc.setFontSize(18);
+      doc.text("Historial de movimientos", 14, 20);
+
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text("Grupo: Muchachitos (10 a 12 años)", 14, 28);
+
+      // Estructurar filas de la tabla
+      const filas = historialMovimientos.map(m => [
+        m.nombre,
+        m.tipo,
+        m.monto,
+        m.hora
+      ]);
+
+      // Dibujar tabla
+      doc.autoTable({
+        startY: 34,
+        head: [['Nombre del Niño', 'Acción', 'Monto', 'Hora / Fecha']],
+        body: filas,
+        theme: 'striped',
+        headStyles: { fillColor: [0, 123, 255] },
+        styles: { fontSize: 10 }
+      });
+
+      // Descargar archivo PDF
+      doc.save(`Historial_Movimientos_Muchachitos_${new Date().toISOString().slice(0,10)}.pdf`);
     };
   </script>
 
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 15px; background: #ebf1f5; color: #333; }
-    h1 { color: #1a252f; margin-bottom: 20px; }
+    
+    /* Encabezado adaptable a pantallas móviles */
+    .header-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    h1 { color: #1a252f; margin: 0; font-size: 1.8em; }
+    
+    .btn-pdf {
+      background: #e74c3c;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+      transition: background 0.2s;
+      width: 100%;
+      text-align: center;
+    }
+    .btn-pdf:hover { background: #c0392b; }
+
+    @media (min-width: 600px) {
+      .btn-pdf { width: auto; }
+    }
+
     .lista { display: flex; flex-direction: column; gap: 12px; }
     
     .row-card { 
@@ -128,7 +243,13 @@
 </head>
 <body>
 
-  <h1>Muchachitos</h1>
+  <div class="header-panel">
+    <div class="top-bar">
+      <h1>Muchachitos</h1>
+    </div>
+    <button class="btn-pdf" onclick="descargarPDF()">📄 Descargar Historial (PDF)</button>
+  </div>
+
   <div id="contenedor" class="lista"></div>
 
 </body>
