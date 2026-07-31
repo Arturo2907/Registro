@@ -4,12 +4,100 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Peques</title>
+
+  <!-- Módulos de Firebase para sincronización en tiempo real -->
+  <script type="module">
+      // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDzCN7HFTHn7_LJjeEo1zMNel4mUPYeJHU",
+  authDomain: "registro-f2721.firebaseapp.com",
+  databaseURL: "https://registro-f2721-default-rtdb.firebaseio.com",
+  projectId: "registro-f2721",
+  storageBucket: "registro-f2721.firebasestorage.app",
+  messagingSenderId: "775332929257",
+  appId: "1:775332929257:web:2242ac68ba55e3e6051a78",
+  measurementId: "G-LB02681RZV"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+    const ninosRef = ref(db, 'ninos');
+
+    const EDAD_MIN = 4;
+    const EDAD_MAX = 6;
+
+    // Escuchar modificaciones en tiempo real
+    onValue(ninosRef, (snapshot) => {
+      const data = snapshot.val();
+      const contenedor = document.getElementById('contenedor');
+
+      if (!data) {
+        contenedor.innerHTML = '<p style="background:white; padding:15px; border-radius:6px;">No hay niños registrados.</p>';
+        return;
+      }
+
+      let html = '';
+      let hayPeques = false;
+
+      for (let id in data) {
+        const n = data[id];
+        if (n.edad >= EDAD_MIN && n.edad <= EDAD_MAX) {
+          hayPeques = true;
+          html += `
+            <div class="row-card">
+              <div class="info-nino">
+                <span class="nombre">${n.nombre}</span>
+                <span class="edad">(${n.edad} años)</span>
+              </div>
+
+              <div class="saldo">$${n.saldo.toFixed(2)}</div>
+
+              <div class="acciones">
+                <div class="action-group">
+                  <input type="number" id="add-${id}" placeholder="Ganó" min="0" step="0.5">
+                  <button class="btn-add" onclick="window.modificarSaldo('${id}', '${n.saldo}', 'add-${id}', true)">+ Sumar</button>
+                </div>
+
+                <div class="action-group">
+                  <input type="number" id="sub-${id}" placeholder="Multa" min="0" step="0.5">
+                  <button class="btn-sub" onclick="window.modificarSaldo('${id}', '${n.saldo}', 'sub-${id}', false)">- Restar</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      contenedor.innerHTML = hayPeques ? html : '<p style="background:white; padding:15px; border-radius:6px;">No hay niños de 4 a 6 años.</p>';
+    });
+
+    window.modificarSaldo = function(id, saldoActual, inputId, esSuma) {
+      const input = document.getElementById(inputId);
+      const valor = parseFloat(input.value);
+
+      if (!isNaN(valor) && valor > 0) {
+        let nuevoSaldo = parseFloat(saldoActual) + (esSuma ? valor : -valor);
+        if (nuevoSaldo < 0) nuevoSaldo = 0;
+
+        // Actualizar directamente en la base de datos de Firebase
+        update(ref(db, `ninos/${id}`), { saldo: nuevoSaldo });
+      }
+    };
+  </script>
+
   <style>
     body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 15px; background: #eef2f5; }
     h1 { color: #1a252f; }
     .lista { display: flex; flex-direction: column; gap: 10px; }
     
-    /* Fila horizontal para cada niño */
     .row-card { 
       background: white; 
       padding: 12px 18px; 
@@ -39,73 +127,9 @@
 </head>
 <body>
 
-  <h1>Peques</h1>
+  <h1>Panel Peques (4 a 6 años)</h1>
   <div id="contenedor" class="lista"></div>
 
-  <script>
-    // Ajusta el rango de edad para cada archivo de grupo
-    const EDAD_MIN = 4;
-    const EDAD_MAX = 6;
-
-    function getNinos() {
-      return JSON.parse(localStorage.getItem('ninos_db')) || [];
-    }
-
-    function updateSaldo(id, monto) {
-      const ninos = getNinos();
-      const index = ninos.findIndex(n => n.id === id);
-      if (index !== -1) {
-        ninos[index].saldo += monto;
-        if (ninos[index].saldo < 0) ninos[index].saldo = 0;
-        localStorage.setItem('ninos_db', JSON.stringify(ninos));
-        render();
-      }
-    }
-
-    function procesarTransaccion(id, inputId, esSuma) {
-      const input = document.getElementById(inputId);
-      const valor = parseFloat(input.value);
-      if (!isNaN(valor) && valor > 0) {
-        updateSaldo(id, esSuma ? valor : -valor);
-        input.value = '';
-      }
-    }
-
-    function render() {
-      const ninos = getNinos().filter(n => n.edad >= EDAD_MIN && n.edad <= EDAD_MAX);
-      const contenedor = document.getElementById('contenedor');
-
-      if (ninos.length === 0) {
-        contenedor.innerHTML = '<p style="background:white; padding:15px; border-radius:6px;">No hay niños registrados en este rango de edad.</p>';
-        return;
-      }
-
-      contenedor.innerHTML = ninos.map(n => `
-        <div class="row-card">
-          <div class="info-nino">
-            <span class="nombre">${n.nombre}</span>
-            <span class="edad">(${n.edad} años)</span>
-          </div>
-
-          <div class="saldo">$${n.saldo.toFixed(2)}</div>
-
-          <div class="acciones">
-            <div class="action-group">
-              <input type="number" id="add-${n.id}" placeholder="Ganó" min="0" step="0.5">
-              <button class="btn-add" onclick="procesarTransaccion(${n.id}, 'add-${n.id}', true)">+ Sumar</button>
-            </div>
-
-            <div class="action-group">
-              <input type="number" id="sub-${n.id}" placeholder="Multa" min="0" step="0.5">
-              <button class="btn-sub" onclick="procesarTransaccion(${n.id}, 'sub-${n.id}', false)">- Restar</button>
-            </div>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    window.addEventListener('storage', render);
-    render();
-  </script>
 </body>
+</html>
 </html>
