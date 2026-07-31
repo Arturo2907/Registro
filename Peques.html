@@ -5,30 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Peques</title>
 
-  <!-- Módulos de Firebase para sincronización en tiempo real -->
+  <!-- Módulos de Firebase importados desde CDN -->
   <script type="module">
-      // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyDzCN7HFTHn7_LJjeEo1zMNel4mUPYeJHU",
-  authDomain: "registro-f2721.firebaseapp.com",
-  databaseURL: "https://registro-f2721-default-rtdb.firebaseio.com",
-  projectId: "registro-f2721",
-  storageBucket: "registro-f2721.firebasestorage.app",
-  messagingSenderId: "775332929257",
-  appId: "1:775332929257:web:2242ac68ba55e3e6051a78",
-  measurementId: "G-LB02681RZV"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyDzCN7HFTHn7_LJjeEo1zMNel4mUPYeJHU",
+      authDomain: "registro-f2721.firebaseapp.com",
+      databaseURL: "https://registro-f2721-default-rtdb.firebaseio.com",
+      projectId: "registro-f2721",
+      storageBucket: "registro-f2721.firebasestorage.app",
+      messagingSenderId: "775332929257",
+      appId: "1:775332929257:web:2242ac68ba55e3e6051a78",
+      measurementId: "G-LB02681RZV"
+    };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+    // Inicializar Firebase y Realtime Database
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
     const ninosRef = ref(db, 'ninos');
 
     const EDAD_MIN = 4;
@@ -87,7 +82,7 @@ const analytics = getAnalytics(app);
         let nuevoSaldo = parseFloat(saldoActual) + (esSuma ? valor : -valor);
         if (nuevoSaldo < 0) nuevoSaldo = 0;
 
-        // Actualizar directamente en la base de datos de Firebase
+        // Actualizar directamente en Firebase
         update(ref(db, `ninos/${id}`), { saldo: nuevoSaldo });
       }
     };
