@@ -21,7 +21,6 @@
       measurementId: "G-LB02681RZV"
     };
 
-    // Inicializar Firebase y Realtime Database
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const ninosRef = ref(db, 'ninos');
@@ -35,7 +34,7 @@
       const contenedor = document.getElementById('contenedor');
 
       if (!data) {
-        contenedor.innerHTML = '<p style="background:white; padding:15px; border-radius:6px;">No hay niños registrados.</p>';
+        contenedor.innerHTML = '<p style="background:white; padding:15px; border-radius:8px;">No hay niños registrados.</p>';
         return;
       }
 
@@ -44,26 +43,32 @@
 
       for (let id in data) {
         const n = data[id];
-        if (n.edad >= EDAD_MIN && n.edad <= EDAD_MAX) {
+        // Forzamos la edad a número por seguridad
+        const edad = Number(n.edad);
+        
+        if (edad >= EDAD_MIN && edad <= EDAD_MAX) {
           hayPeques = true;
+          // Forzamos el saldo a número seguro para evitar fallos con .toFixed()
+          const saldoNum = Number(n.saldo) || 0;
+
           html += `
             <div class="row-card">
               <div class="info-nino">
                 <span class="nombre">${n.nombre}</span>
-                <span class="edad">(${n.edad} años)</span>
+                <span class="edad">(${edad} años)</span>
               </div>
 
-              <div class="saldo">$${n.saldo.toFixed(2)}</div>
+              <div class="saldo">$${saldoNum.toFixed(2)}</div>
 
               <div class="acciones">
                 <div class="action-group">
                   <input type="number" id="add-${id}" placeholder="Ganó" min="0" step="0.5">
-                  <button class="btn-add" onclick="window.modificarSaldo('${id}', '${n.saldo}', 'add-${id}', true)">+ Sumar</button>
+                  <button class="btn-add" onclick="window.modificarSaldo('${id}', ${saldoNum}, 'add-${id}', true)">+ Sumar</button>
                 </div>
 
                 <div class="action-group">
                   <input type="number" id="sub-${id}" placeholder="Multa" min="0" step="0.5">
-                  <button class="btn-sub" onclick="window.modificarSaldo('${id}', '${n.saldo}', 'sub-${id}', false)">- Restar</button>
+                  <button class="btn-sub" onclick="window.modificarSaldo('${id}', ${saldoNum}, 'sub-${id}', false)">- Restar</button>
                 </div>
               </div>
             </div>
@@ -71,7 +76,7 @@
         }
       }
 
-      contenedor.innerHTML = hayPeques ? html : '<p style="background:white; padding:15px; border-radius:6px;">No hay niños de 4 a 6 años.</p>';
+      contenedor.innerHTML = hayPeques ? html : '<p style="background:white; padding:15px; border-radius:8px;">No hay niños de 4 a 6 años.</p>';
     });
 
     window.modificarSaldo = function(id, saldoActual, inputId, esSuma) {
@@ -82,47 +87,50 @@
         let nuevoSaldo = parseFloat(saldoActual) + (esSuma ? valor : -valor);
         if (nuevoSaldo < 0) nuevoSaldo = 0;
 
-        // Actualizar directamente en Firebase
+        // Actualizar directamente en la base de datos de Firebase
         update(ref(db, `ninos/${id}`), { saldo: nuevoSaldo });
       }
     };
   </script>
 
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 15px; background: #eef2f5; }
-    h1 { color: #1a252f; }
-    .lista { display: flex; flex-direction: column; gap: 10px; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 15px; background: #ebf1f5; color: #333; }
+    h1 { color: #1a252f; margin-bottom: 20px; }
+    .lista { display: flex; flex-direction: column; gap: 12px; }
     
+    /* Diseño exacto a la segunda imagen */
     .row-card { 
       background: white; 
-      padding: 12px 18px; 
-      border-radius: 8px; 
-      box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
-      border-left: 5px solid #007bff;
+      padding: 14px 20px; 
+      border-radius: 10px; 
+      box-shadow: 0 3px 8px rgba(0,0,0,0.06); 
+      border-left: 6px solid #007bff;
       display: flex; 
       align-items: center; 
       justify-content: space-between; 
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 15px;
     }
 
-    .info-nino { display: flex; align-items: center; gap: 15px; min-width: 180px; }
-    .nombre { font-size: 1.1em; font-weight: bold; color: #333; }
-    .edad { color: #666; font-size: 0.9em; }
-    .saldo { font-size: 1.3em; font-weight: bold; color: #28a745; min-width: 90px; text-align: center; }
+    .info-nino { display: flex; align-items: center; gap: 10px; min-width: 180px; }
+    .nombre { font-size: 1.15em; font-weight: 700; color: #212529; }
+    .edad { color: #6c757d; font-size: 0.95em; }
+    .saldo { font-size: 1.35em; font-weight: 800; color: #28a745; min-width: 100px; text-align: center; }
 
-    .acciones { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .action-group { display: flex; align-items: center; gap: 4px; }
+    .acciones { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .action-group { display: flex; align-items: center; gap: 6px; }
     
-    input[type="number"] { width: 70px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
-    button { cursor: pointer; border: none; padding: 7px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; }
+    input[type="number"] { width: 75px; padding: 7px 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px; outline: none; }
+    input[type="number"]:focus { border-color: #007bff; }
+    button { cursor: pointer; border: none; padding: 8px 14px; border-radius: 6px; color: white; font-weight: bold; font-size: 14px; transition: opacity 0.2s; }
+    button:hover { opacity: 0.9; }
     .btn-add { background: #28a745; }
     .btn-sub { background: #dc3545; }
   </style>
 </head>
 <body>
 
-  <h1>Panel Peques (4 a 6 años)</h1>
+  <h1>Peques</h1>
   <div id="contenedor" class="lista"></div>
 
 </body>
