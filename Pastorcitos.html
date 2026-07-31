@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pastorcitos</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 15px; background: #eef2f5; }
+    h1 { color: #1a252f; }
+    .lista { display: flex; flex-direction: column; gap: 10px; }
+    
+    /* Fila horizontal para cada niño */
+    .row-card { 
+      background: white; 
+      padding: 12px 18px; 
+      border-radius: 8px; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08); 
+      border-left: 5px solid #007bff;
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .info-nino { display: flex; align-items: center; gap: 15px; min-width: 180px; }
+    .nombre { font-size: 1.1em; font-weight: bold; color: #333; }
+    .edad { color: #666; font-size: 0.9em; }
+    .saldo { font-size: 1.3em; font-weight: bold; color: #28a745; min-width: 90px; text-align: center; }
+
+    .acciones { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .action-group { display: flex; align-items: center; gap: 4px; }
+    
+    input[type="number"] { width: 70px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+    button { cursor: pointer; border: none; padding: 7px 12px; border-radius: 4px; color: white; font-weight: bold; font-size: 13px; }
+    .btn-add { background: #28a745; }
+    .btn-sub { background: #dc3545; }
+  </style>
+</head>
+<body>
+
+  <h1>Pastorcitos</h1>
+  <div id="contenedor" class="lista"></div>
+
+  <script>
+    // Ajusta el rango de edad para cada archivo de grupo
+    const EDAD_MIN = 7;
+    const EDAD_MAX = 9;
+
+    function getNinos() {
+      return JSON.parse(localStorage.getItem('ninos_db')) || [];
+    }
+
+    function updateSaldo(id, monto) {
+      const ninos = getNinos();
+      const index = ninos.findIndex(n => n.id === id);
+      if (index !== -1) {
+        ninos[index].saldo += monto;
+        if (ninos[index].saldo < 0) ninos[index].saldo = 0;
+        localStorage.setItem('ninos_db', JSON.stringify(ninos));
+        render();
+      }
+    }
+
+    function procesarTransaccion(id, inputId, esSuma) {
+      const input = document.getElementById(inputId);
+      const valor = parseFloat(input.value);
+      if (!isNaN(valor) && valor > 0) {
+        updateSaldo(id, esSuma ? valor : -valor);
+        input.value = '';
+      }
+    }
+
+    function render() {
+      const ninos = getNinos().filter(n => n.edad >= EDAD_MIN && n.edad <= EDAD_MAX);
+      const contenedor = document.getElementById('contenedor');
+
+      if (ninos.length === 0) {
+        contenedor.innerHTML = '<p style="background:white; padding:15px; border-radius:6px;">No hay niños registrados en este rango de edad.</p>';
+        return;
+      }
+
+      contenedor.innerHTML = ninos.map(n => `
+        <div class="row-card">
+          <div class="info-nino">
+            <span class="nombre">${n.nombre}</span>
+            <span class="edad">(${n.edad} años)</span>
+          </div>
+
+          <div class="saldo">$${n.saldo.toFixed(2)}</div>
+
+          <div class="acciones">
+            <div class="action-group">
+              <input type="number" id="add-${n.id}" placeholder="Ganó" min="0" step="0.5">
+              <button class="btn-add" onclick="procesarTransaccion(${n.id}, 'add-${n.id}', true)">+ Sumar</button>
+            </div>
+
+            <div class="action-group">
+              <input type="number" id="sub-${n.id}" placeholder="Multa" min="0" step="0.5">
+              <button class="btn-sub" onclick="procesarTransaccion(${n.id}, 'sub-${n.id}', false)">- Restar</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.addEventListener('storage', render);
+    render();
+  </script>
+</body>
+</html>

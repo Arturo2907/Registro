@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Principal - Registro y Control</title>
+
+  <!-- Librería para generar y descargar archivos Excel (.xlsx) directamente -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 20px; background: #f4f6f9; color: #333; }
+    h1 { color: #1a252f; text-align: center; }
+    .card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.08); margin-bottom: 25px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
+    input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    input:focus { border-color: #007bff; outline: none; }
+    .btn { border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: background 0.2s; }
+    .btn-primary { background: #28a745; color: white; }
+    .btn-primary:hover { background: #218838; }
+    .btn-excel { background: #1d6f42; color: white; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-excel:hover { background: #155231; }
+    nav { display: flex; justify-content: space-around; background: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    nav a { color: #007bff; text-decoration: none; font-weight: bold; font-size: 15px; }
+    nav a:hover { text-decoration: underline; }
+    
+    /* Envuelve la tabla para scroll horizontal en pantallas pequeñas */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    
+    /* white-space: nowrap evita que el texto como "Grupo 3 (10+ años)" se divida en varias filas */
+    th, td { 
+      border: 1px solid #e2e8f0; 
+      padding: 12px; 
+      text-align: left; 
+      white-space: nowrap; 
+    }
+
+    th { background: #f8fafc; font-weight: 600; color: #475569; }
+    tr:nth-child(even) { background-color: #f8fafc; }
+    .btn-del { background: #dc3545; color: white; padding: 6px 12px; font-size: 12px; border-radius: 4px; border: none; cursor: pointer; }
+    .btn-del:hover { background: #bd2130; }
+    .flex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>Control Central de Niños</h1>
+  
+  <nav>
+    <strong>Paneles por Edad:</strong>
+    <a href="Peques.html" target="_blank">Peques</a>
+    <a href="Pastorcitos.html" target="_blank">Pastorcitos</a>
+    <a href="Muchachitos.html" target="_blank">Muchachitos</a>
+  </nav>
+
+  <div class="card">
+    <h2>Registrar Nuevo Niño</h2>
+    <form id="formRegistro">
+      <div class="form-group">
+        <label>Nombre:</label>
+        <input type="text" id="nombre" required placeholder="Ej. Mateo">
+      </div>
+      <div class="form-group">
+        <label>Edad:</label>
+        <input type="number" id="edad" min="1" max="12" required placeholder="Ej. 5">
+      </div>
+      <div class="form-group">
+        <label>Saldo Inicial ($):</label>
+        <input type="number" id="saldo" min="0" step="0.5" value="0" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Guardar Niño</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="flex-header">
+      <h2 style="margin: 0;">Lista General y Reporte</h2>
+      <button class="btn btn-excel" onclick="exportarExcel()">📊 Descargar Excel (.xlsx)</button>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Edad</th>
+            <th>Grupo Asignado</th>
+            <th>Saldo Actual</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaNinos"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('formRegistro');
+    const tabla = document.getElementById('tablaNinos');
+
+    function getNinos() {
+      return JSON.parse(localStorage.getItem('ninos_db')) || [];
+    }
+
+    function saveNinos(ninos) {
+      localStorage.setItem('ninos_db', JSON.stringify(ninos));
+      renderTabla();
+    }
+
+    function obtenerGrupo(edad) {
+      if (edad >= 4 && edad <= 6) return 'Peques';
+      if (edad >= 7 && edad <= 9) return 'Pastorcitos';
+      if (edad >= 10) return 'Muchachitos';
+      return 'Sin Grupo';
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const ninos = getNinos();
+      const nuevoNino = {
+        id: Date.now(),
+        nombre: document.getElementById('nombre').value.trim(),
+        edad: parseInt(document.getElementById('edad').value),
+        saldo: parseFloat(document.getElementById('saldo').value)
+      };
+      ninos.push(nuevoNino);
+      saveNinos(ninos);
+      form.reset();
+    });
+
+    function eliminarNino(id) {
+      if (confirm('¿Estás seguro de que deseas eliminar este registro?')) {
+        const ninos = getNinos().filter(n => n.id !== id);
+        saveNinos(ninos);
+      }
+    }
+
+    function renderTabla() {
+      const ninos = getNinos();
+      if (ninos.length === 0) {
+        tabla.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#888;">No hay niños registrados aún.</td></tr>';
+        return;
+      }
+      tabla.innerHTML = ninos.map(n => `
+        <tr>
+          <td><strong>${n.nombre}</strong></td>
+          <td>${n.edad} años</td>
+          <td>${obtenerGrupo(n.edad)}</td>
+          <td style="color: #28a745;"><strong>$${n.saldo.toFixed(2)}</strong></td>
+          <td><button class="btn-del" onclick="eliminarNino(${n.id})">Eliminar</button></td>
+        </tr>
+      `).join('');
+    }
+
+    // Función para descargar los datos en Excel
+    function exportarExcel() {
+      const ninos = getNinos();
+      if (ninos.length === 0) {
+        alert('No hay datos registrados para exportar a Excel.');
+        return;
+      }
+
+      const datosExcel = ninos.map(n => ({
+        'Nombre': n.nombre,
+        'Edad': n.edad,
+        'Grupo': obtenerGrupo(n.edad),
+        'Saldo Actual ($)': n.saldo
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Registro Niños");
+
+      worksheet['!cols'] = [
+        { wch: 25 },
+        { wch: 10 },
+        { wch: 22 },
+        { wch: 18 }
+      ];
+
+      const fecha = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(workbook, `Reporte_Saldos_Ninos_${fecha}.xlsx`);
+    }
+
+    // Escuchar actualizaciones hechas en las pestañas de grupos
+    window.addEventListener('storage', renderTabla);
+    
+    // Renderizado inicial
+    renderTabla();
+  </script>
+</body>
+</html>
