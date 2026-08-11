@@ -98,16 +98,30 @@
     });
 
     // Modificar saldo y registrar movimiento
-    window.modificarSaldo = function(id, nombreNino, saldoActual, inputId, esSuma) {
-      const input = document.getElementById(inputId);
-      const valor = parseFloat(input.value);
+    // Importar 'get' de firebase-database en la parte superior del script:
+// import { initializeApp } from "...";
+// import { getDatabase, ref, onValue, update, push, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-      if (!isNaN(valor) && valor > 0) {
-        let nuevoSaldo = parseFloat(saldoActual) + (esSuma ? valor : -valor);
+window.modificarSaldo = function(id, nombreNino, _, inputId, esSuma) {
+  const input = document.getElementById(inputId);
+  const valor = parseFloat(input.value);
+
+  if (!isNaN(valor) && valor > 0) {
+    const ninoRef = ref(db, `ninos/${id}`);
+
+    // Obtenemos el saldo actual directo de Firebase en el momento exacto del clic
+    get(ninoRef).then((snapshot) => {
+      if (snapshot.exists()) {
+        const ninoData = snapshot.val();
+        const saldoActualEnNube = parseFloat(ninoData.saldo) || 0;
+
+        let nuevoSaldo = saldoActualEnNube + (esSuma ? valor : -valor);
         if (nuevoSaldo < 0) nuevoSaldo = 0;
 
-        update(ref(db, `ninos/${id}`), { saldo: nuevoSaldo });
+        // Actualizamos en Firebase
+        update(ninoRef, { saldo: nuevoSaldo });
 
+        // Guardamos el historial de movimientos
         const ahora = new Date();
         const horaFormateada = ahora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const fechaFormateada = ahora.toLocaleDateString();
@@ -120,11 +134,15 @@
         };
 
         push(historialRef, movimiento);
-
         input.value = '';
       }
-    };
-
+    }).catch((error) => {
+      console.error("Error al actualizar el saldo:", error);
+      alert("Hubo un error de conexión al actualizar el saldo.");
+    });
+  }
+};
+    
     // Función para descargar PDF agrupado y ordenado por niño
     window.descargarPDF = function() {
       if (historialMovimientos.length === 0) {
